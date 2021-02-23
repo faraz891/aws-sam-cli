@@ -209,3 +209,44 @@ class TestSamBuildableStackProvider(TestCase):
                 Stack("", "ChildStack", child_location_path, None, LEAF_TEMPLATE),
             ],
         )
+
+    @parameterized.expand(
+        [
+            (AWS_SERVERLESS_APPLICATION, "Location", "./child.yaml", os.path.join("somedir", "child.yaml")),
+            (AWS_SERVERLESS_APPLICATION, "Location", "child.yaml", os.path.join("somedir", "child.yaml")),
+            (AWS_CLOUDFORMATION_STACK, "TemplateURL", "./child.yaml", os.path.join("somedir", "child.yaml")),
+            (AWS_CLOUDFORMATION_STACK, "TemplateURL", "child.yaml", os.path.join("somedir", "child.yaml")),
+            (AWS_SERVERLESS_APPLICATION, "Location", "file:///child.yaml", "/child.yaml"),
+            (AWS_CLOUDFORMATION_STACK, "TemplateURL", "file:///child.yaml", "/child.yaml"),
+        ]
+    )
+    def test_pseudo_parameter_overrides_can_be_passed_to_child_stacks(
+        self, resource_type, location_property_name, child_location, child_location_path
+    ):
+        template_file = "somedir/template.yaml"
+        template = {
+            "Resources": {
+                "ChildStack": {
+                    "Type": resource_type,
+                    "Properties": {location_property_name: child_location},
+                }
+            }
+        }
+        self.get_template_data_mock.side_effect = lambda t: {
+            template_file: template,
+            child_location_path: LEAF_TEMPLATE,
+        }.get(t)
+
+        pseudo_parameter_overrides = {"AWS::Region": "custom_region"}
+
+        with patch.dict(os.environ, {SamLocalStackProvider.ENV_SAM_CLI_ENABLE_NESTED_STACK: "1"}):
+            stacks = SamLocalStackProvider.get_stacks(
+                template_file, "", "", parameter_overrides=None, pseudo_parameter_overrides=pseudo_parameter_overrides
+            )
+        self.assertListEqual(
+            stacks,
+            [
+                Stack("", "", template_file, pseudo_parameter_overrides, template),
+                Stack("", "ChildStack", child_location_path, pseudo_parameter_overrides, LEAF_TEMPLATE),
+            ],
+        )
