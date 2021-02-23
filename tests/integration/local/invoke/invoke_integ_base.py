@@ -22,6 +22,12 @@ class InvokeIntegBase(TestCase):
         cls.event_utf8_path = str(cls.test_data_path.joinpath("invoke", "event_utf8.json"))
         cls.env_var_path = str(cls.test_data_path.joinpath("invoke", "vars.json"))
 
+        cls.env = None
+        if cls.nested_stack_enabled:
+            newenv = os.environ.copy()
+            newenv["SAM_CLI_ENABLE_NESTED_STACK"] = "1"
+            cls.env = newenv
+
     @staticmethod
     def get_integ_dir():
         return Path(__file__).resolve().parents[2]
